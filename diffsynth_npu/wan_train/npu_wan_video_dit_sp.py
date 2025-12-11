@@ -6,12 +6,12 @@ from typing import Tuple, Optional, List
 from diffsynth.models import wan_video_dit
 from einops import rearrange
 
-import is_npu_available
+import diffsynth_npu
 from deepspeed.sequence.layer import DistributedAttention
 from .parallel_states import get_sequence_parallel_group, get_sequence_parallel_state, \
     get_sequence_parallel_size
 import torch.distributed as dist
-from ..patch_utils import log_replace_info
+from ..utils.patch_utils import log_replace_info
 from diffsynth.models.utils import hash_state_dict_keys
 
 
@@ -46,7 +46,7 @@ class _SelfAttentionNpu(nn.Module):
         # 使用 flash_attention 作为 local_attention
         self.dist_attn = DistributedAttention(
             # 传入 flash_attention
-            local_attention=flash_attention_sequence_parallelism_Npu,
+            local_attention=_flash_attention_sequence_parallelism_Npu,
             # 获取 DeepSpeed 的序列并行组
             sequence_process_group=get_sequence_parallel_group(),
             gather_idx=2,  # 将输入时切分的序列gather聚合
@@ -102,7 +102,7 @@ class _CrossAttentionNpu(nn.Module):
 
         # 使用 flash_attention 作为 local_attention
         self.dist_attn = DistributedAttention(
-            local_attention=flash_attention_sequence_parallelism_Npu,  # 传入 flash_attention
+            local_attention=_flash_attention_sequence_parallelism_Npu,  # 传入 flash_attention
             sequence_process_group=get_sequence_parallel_group(),  # 获取 DeepSpeed 的序列并行组
             gather_idx=2,  # 将输入切分的序列gather
             scatter_idx=1  # 将num_heads切分
@@ -596,7 +596,12 @@ def _split(
 
     return output
 
-
+HASH_VALUES_MAP = {
+            "t2v-large" : "cb104773c6c2cb6df4f9529ad5c60d0b",
+            "t2v-large1": "9269f8db9040a9d860eaca435be61814",
+            "t2v-large2": "aafcfd9672c3a2456dc46e1cb6e52c70",
+            "t2v-large3": "6bfcfb3b342cb286ce886889d519a77e",
+        }
 ####################通信并行相关method-end
 
 class WanModelStateDictConverter:
@@ -647,13 +652,6 @@ class WanModelStateDictConverter:
             "scale_shift_table": "head.modulation",
             "proj_out.bias": "head.head.bias",
             "proj_out.weight": "head.head.weight",
-        }
-        HASH_VALUES_MAP = {
-            "t2v-large" : "cb104773c6c2cb6df4f9529ad5c60d0b",
-            "t2v-large1": "9269f8db9040a9d860eaca435be61814",
-            "t2v-large2": "aafcfd9672c3a2456dc46e1cb6e52c70",
-            "t2v-large3": "6bfcfb3b342cb286ce886889d519a77e",
-
         }
         state_dict_ = {}
         for name, param in state_dict.items():

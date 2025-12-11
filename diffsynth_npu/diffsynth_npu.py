@@ -3,7 +3,7 @@ import sys
 import logging
 import torch
 
-from utils.device_utils import is_npu_available
+from .utils.device_utils import is_npu_available
 if is_npu_available():
     from torch_npu.contrib import transfer_to_npu
     torch_npu.npu.set_compile_mode(jit_compile=False)

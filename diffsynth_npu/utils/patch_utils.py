@@ -1,5 +1,5 @@
-from logger import init_logger
-from device_utils import is_npu_available
+from .logger import init_logger
+from .device_utils import is_npu_available
 
 logger = init_logger(__name__)
 
